@@ -15,7 +15,7 @@ async function saveLedger(data){
 async function start(){
  try{
   window.saldoAccount=await accountRequest();
-  for(const name of ['app','features']){
+  for(const name of ['app','features','upgrades']){
    await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/'+name+'.js';script.onload=resolve;script.onerror=reject;document.head.append(script)});
   }
   gate.hidden=true;element('overview').hidden=false;element('logout').hidden=false;
@@ -39,3 +39,22 @@ element('cancelKey').onclick=()=>{element('newKey').value='';element('enroll').h
 element('confirmKey').onclick=()=>authenticate('create',element('newKey').value);
 element('logout').onclick=async()=>{try{await accountRequest({action:'logout'});channel.postMessage('changed');location.reload()}catch(e){alert(e.message)}};
 start();
+
+async function usePasskey(register){
+ const feedback=register?element('toolStatus'):statusLine;
+ const btn=element(register?'passRegister':'passLogin');
+ btn.disabled=true;
+ try{
+  const lib=window.SimpleWebAuthnBrowser;
+  if(!lib?.browserSupportsWebAuthn())throw Error('Passkeys are unavailable here. Use your account key.');
+  const prefix=register?'register':'authenticate';
+  const optionsJSON=await accountRequest({action:prefix+'Options'});
+  const response=await lib[register?'startRegistration':'startAuthentication']({optionsJSON});
+  await accountRequest({action:prefix+'Finish',response});
+  if(register)feedback.textContent='Passkey added. Keep your account key for recovery.';
+  else{channel.postMessage('changed');location.reload()}
+ }catch(e){feedback.textContent=e.name==='NotAllowedError'?'Passkey request canceled or timed out.':e.message}
+ finally{btn.disabled=false}
+}
+element('passLogin').onclick=()=>usePasskey(false);
+element('passRegister').onclick=()=>usePasskey(true);

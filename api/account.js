@@ -1,3 +1,4 @@
+import {passkeys} from '../lib/passkeys.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { get, put, del, BlobPreconditionFailedError } from '@vercel/blob';
 
@@ -24,6 +25,8 @@ export default async function handler(req,res){
   if(!['GET','POST'].includes(req.method))return fail(405,'Unsupported method.');
   if(req.method==='POST'&&(req.headers.origin!=='https://'+req.headers.host||!req.headers['content-type']?.startsWith('application/json')))return fail(403,'Open Saldo to make changes.');
   const body=req.body||{},op=req.method==='GET'?'load':body.action;
+  const keyFlow=owner=>passkeys({req,res,op,owner,fetchDoc,put,privateBlob,hash,token,signIn});
+  if(op==='authenticateOptions'||op==='authenticateFinish')return await keyFlow(null);
   if(op==='create'||op==='login'){
    const key=body.key;
    if(!valid(key))return fail(400,'Enter a valid Saldo account key.');
@@ -39,6 +42,7 @@ export default async function handler(req,res){
   if(op==='logout'){await del(path);res.setHeader('Set-Cookie',cookie('',0));return res.json({ok:true})}
   const session=await fetchDoc(path);
   if(!session||session.data.until<=Date.now())return fail(401,'Your session expired. Sign in again.');
+  if(op==='registerOptions'||op==='registerFinish')return await keyFlow(session.data.owner);
   const ledger='ledgers/'+session.data.owner;
   if(op==='load'){const doc=await fetchDoc(ledger);return res.json({...doc,owner:session.data.owner})}
   if(op!=='save')return fail(400,'Unknown action.');

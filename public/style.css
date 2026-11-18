@@ -3,3 +3,5 @@
 .tools{margin-top:18px}.tools input[type=date],#calMonth{width:auto}.intro h1{margin-right:auto}.intro>div{flex:1}.tools button,.intro button{margin:3px}.reviewItem{padding:12px 0;border-top:1px solid #dce1db}.reviewItem p{margin:6px 0}footer a{text-decoration:underline}#cashBtn{margin-top:8px}
 
 [hidden]{display:none!important}.signin{max-width:510px;margin:7vh auto;padding:32px}.signin h1{font-size:38px}.signin p{line-height:1.55}.signin input{font-size:16px}
+
+#entries .row span{flex:1}#entries .row button{font-size:13px}#dupLabel{color:#7a420b}#activity .heading{flex-wrap:wrap}
