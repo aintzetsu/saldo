@@ -311,6 +311,7 @@
    });
   $('qAccount').value=lastAccount.id;
   $('qCat').value=recentCategories[0]||'Food';
+  window.saldoTracking?.watchDraft($('qNote'),$('qCat'));
  };
  $('quick').onclick=()=>quickExpense();
  if(extra.open&&$('qAmount')){

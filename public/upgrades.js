@@ -40,6 +40,7 @@ function validateBackup(file){
   Object.entries(s.reconciliations).some(([id,record])=>!accounts.has(id)||!dt(record?.date)||!num(record.actual)||
     !Array.isArray(record.ids)||record.ids.some(x=>!validId(x))||new Set(record.ids).size!==record.ids.length)))reject();
  if(window.saldoPlanningTools?.validateBackup(s)===false)reject();
+ if(window.saldoTracking?.validRules(s.trackingRules)===false)reject();
  return s;
 }
 function mergeBackup(target,source){
@@ -60,6 +61,7 @@ function mergeBackup(target,source){
   target.csvMappings=[...presets.values()].slice(-30);
  }
  window.saldoPlanningTools?.mergeBackup(target,source);
+ window.saldoTracking?.mergeRules(target,source);
  if(window.saldoTransactionTools?.validateEntries(target.entries)===false)throw Error('This backup conflicts with the split or refund details in your existing ledger.');
  return counts;
 }
@@ -106,6 +108,8 @@ $('receiptBtn').onclick=async()=>{
   parsed=receiptDraft((await worker.recognize(file)).data.text);
  }catch{failure=true}finally{if(worker)await worker.terminate();btn.disabled=false;btn.textContent='Scan receipt'}
  openForm('entry');$('title').textContent='Review receipt';const gcash=db.accounts.find(a=>/gcash/i.test(a.name));if(gcash)$('acct').value=gcash.id;
- $('amount').value=parsed.amount||'';$('date').value=parsed.date||'';$('desc').value=parsed.description||'';receiptFields(parsed.reference);
+ $('amount').value=parsed.amount||'';$('date').value=parsed.date||'';$('desc').value=parsed.description||'';
+ $('desc').dispatchEvent(new Event('input'));
+ receiptFields(parsed.reference);
  $('fields').insertAdjacentHTML('afterbegin',hint(failure?'Could not read this image. Enter the details below or close to retry.':'Check the amount, date, recipient and transaction type before saving.'));
 };

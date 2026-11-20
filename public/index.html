@@ -145,6 +145,7 @@
     <h2 id="activity-title">Transactions</h2>
     <div class="actions">
      <button class="light" id="receiptBtn">Scan receipt</button>
+     <button type="button" class="light" id="pasteTransaction">Paste transaction</button>
      <button class="light" id="importBtn">Import CSV</button>
     </div>
    </div>
@@ -200,6 +201,11 @@
   <article class="tools" data-view="settings">
    <div class="heading"><h2>Appearance</h2></div>
    <label class="theme-setting">Theme<select id="themePreference"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+  </article>
+  <article class="tools" data-view="settings" aria-labelledby="trackingTitle">
+   <div class="heading"><h2 id="trackingTitle">Tracking automation</h2><button type="button" class="light" id="addTrackingRule">Add category rule</button></div>
+   <p class="empty">Rules fill categories for expenses with a matching description. Saldo can also suggest a category when the same description has been categorized consistently.</p>
+   <div id="trackingRules"></div>
   </article>
   <article class="tools" data-view="settings">
    <div class="heading"><h2>Account tools</h2></div>

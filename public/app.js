@@ -311,7 +311,8 @@ function openForm(kind){
  if(kind==='csv')fields+=hint('Choose a UTF-8 CSV with columns date,description,amount,category. Use YYYY-MM-DD dates and negative amounts for expenses. Review possible transfers and duplicates after import. Matching imported rows are skipped.')+label('CSV file',input('file','type="file" accept=".csv,text/csv"'));
  $('fields').innerHTML=fields;$('save').textContent=kind==='csv'?'Import transactions':'Save';
  if(kind==='entry')$('kind').onchange=()=>{const transfer=$('kind').value==='Transfer';$('dest').hidden=!transfer;$('catField').hidden=transfer;$('cat').required=!transfer};
- dialog.showModal()
+ dialog.showModal();
+ if(kind==='entry')window.saldoTracking?.watchDraft($('desc'),$('cat'),()=>!editId&&$('kind').value==='Expense',$('kind'));
 }
 function cents(raw){if(!/^-?\d+(\.\d{1,2})?$/.test(raw.trim()))throw Error('Enter an amount with up to two decimal places.');const n=Math.round(Number(raw)*100);if(!Number.isSafeInteger(n)||Math.abs(n)>1e13)throw Error('Amount exceeds the supported range.');return n}
 function parseCSV(text){

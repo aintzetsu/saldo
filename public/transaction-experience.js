@@ -336,6 +336,7 @@
  function csvEntries(records,mapping,state) {
   const known=new Set([...state.ignored,...state.entries.map(entry=>entry.key)]);
   const potential=new Set(state.entries.filter(entry=>entry.account===mapping.account).map(entry=>JSON.stringify([entry.date,entry.amount])));
+  const suggest=window.saldoTracking?.buildSuggester(state);
   const occurrences=new Map();
   return records.map((record,index)=>{
    const value=field=>record[mapping.fields[field]]||'';
@@ -353,7 +354,7 @@
     const occurrence=occurrences.get(signature)||0;
     occurrences.set(signature,occurrence+1);
     const key=JSON.stringify([signature,occurrence]);
-    const entry={account:mapping.account,date,description:item.description,amount,category:category||'Other',key};
+    const entry={account:mapping.account,date,description:item.description,amount,category:category||(amount<0&&suggest?.(item.description)?.category)||'Other',key};
     if(known.has(key))return {...item,entry,status:'skipped',reason:'Already imported'};
     if(potential.has(JSON.stringify([date,amount])))return {...item,entry,status:'possible',reason:'Possible duplicate'};
     return {...item,entry,status:'ready',reason:'Ready to add'};
