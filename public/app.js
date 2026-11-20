@@ -1,7 +1,9 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const dbKey='saldo-ledger-v1', dialog=document.querySelector('dialog');
-const money=c=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(c/100);
+const moneyFormat=new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'});
+const amountsHidden=()=>document.documentElement.dataset.privacy==='on';
+const money=c=>amountsHidden()?'••••':moneyFormat.format(c/100);
 const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Manila'});
 const empty=()=>({accounts:[],entries:[]});
 function read(){const state=structuredClone(window.saldoAccount.data);state.entries.forEach((e,i)=>e.id??='legacy-'+i);state.checks??={};state.subs??=[];state.dismissed??=[];state.ignored??=[];return state}
@@ -11,29 +13,53 @@ function row(title,detail,value){return '<div class="row"><span>'+escapeText(tit
 const hint=s=>'<div class="empty">'+s+'</div>';
 const transactionsPerPage=25;
 const activityDate=new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeZone:'UTC'});
-const activity={page:0,month:''};
+const activity={page:0,month:'',category:''};
 const accountFilter=$('activityAccount');
 
 function transactionType(entry){
  if(entry.to||entry.link)return 'transfer';
+ if(entry.refundOf)return 'refund';
  return entry.amount>0?'income':'expense';
 }
 
-function filterActivity(entries,{month,account,type,search},accounts){
+function spendingChanges(entry,entriesById){
+ const calculate=window.saldoTransactionTools?.transactionCategoryChanges;
+ if(calculate)return calculate(entry,entriesById);
+ if(typeof transactionCategoryChanges==='function')return transactionCategoryChanges(entry,entriesById);
+ return transactionType(entry)==='expense'?[[entry.category,-entry.amount]]:[];
+}
+
+function filterActivity(entries,{month,account,type,search,from,to,category},accounts){
  const accountNames=new Map(accounts.map(({id,name})=>[id,name]));
+ const entriesById=category||search.trim()?new Map(entries.map(entry=>[entry.id,entry])):null;
  const terms=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
  return entries.filter(entry=>{
   if(month&&!entry.date.startsWith(month))return false;
+  if((from&&entry.date<from)||(to&&entry.date>to))return false;
   if(account&&entry.account!==account&&entry.to!==account)return false;
   if(type&&transactionType(entry)!==type)return false;
+  const categories=entriesById?spendingChanges(entry,entriesById).map(([name])=>name):[];
+  if(category&&!categories.includes(category))return false;
   if(!terms.length)return true;
-  const text=[entry.description,entry.category,entry.reference,entry.date,accountNames.get(entry.account),accountNames.get(entry.to)].join(' ').toLowerCase();
+  const text=[entry.description,entry.category,...categories,entry.reference,entry.date,accountNames.get(entry.account),accountNames.get(entry.to)].join(' ').toLowerCase();
   return terms.every(term=>text.includes(term));
  }).sort((a,b)=>b.date.localeCompare(a.date));
 }
 
+function getActivityEntries(){
+ const range=$('activityRange').value;
+ return filterActivity(db.entries,{
+  month:range==='month'?$('month').value:null,
+  account:accountFilter.value,
+  type:$('activityType').value,
+  search:$('activitySearch').value,
+  category:activity.category,
+  ...window.saldoTransactionTools?.dateFilters()
+ },db.accounts);
+}
+
 function renderActivity(){
- const {accounts,entries}=db;
+ const {accounts}=db;
  const month=$('month').value;
  if(activity.month!==month){
   activity.month=month;
@@ -47,10 +73,12 @@ function renderActivity(){
   accountFilter.replaceChildren(new Option('All accounts',''),...accounts.map(a=>new Option(a.name,a.id)));
   if(accounts.some(a=>a.id===selected))accountFilter.value=selected;
  }
- const account=accountFilter.value,type=$('activityType').value,search=$('activitySearch').value;
- const allDates=$('activityRange').value==='all';
- const filtersApplied=Boolean(account||type||search.trim());
- const matches=filterActivity(entries,{month:allDates?null:month,account,type,search},accounts);
+ const range=$('activityRange').value;
+ const allDates=range==='all';
+ const filtersApplied=Boolean(accountFilter.value||$('activityType').value||$('activitySearch').value.trim()||activity.category||range==='custom');
+ $('categoryFilterStatus').hidden=!activity.category;
+ $('categoryFilterStatus').textContent=activity.category;
+ const matches=getActivityEntries();
  const lastPage=Math.max(0,Math.ceil(matches.length/transactionsPerPage)-1);
  activity.page=Math.min(activity.page,lastPage);
  const offset=activity.page*transactionsPerPage;
@@ -66,8 +94,8 @@ function renderActivity(){
  let previousDate='';
  $('entries').innerHTML=visible.map(entry=>{
   const kind=transactionType(entry);
-  const detail=[accountNames.get(entry.account),entry.link?'Matched transfer':entry.to?'To '+(accountNames.get(entry.to)||'another account'):entry.category].filter(Boolean).join(' · ');
-  const value=(kind==='income'?'+':'')+money(entry.amount);
+  const detail=[accountNames.get(entry.account),entry.link?'Matched transfer':entry.to?'To '+(accountNames.get(entry.to)||'another account'):entry.refundOf?'Linked refund':entry.splits?.length?'Split · '+entry.splits.map(split=>split.category).join(', '):entry.category].filter(Boolean).join(' · ');
+  const value=(!amountsHidden()&&(kind==='income'||kind==='refund')?'+':'')+money(entry.amount);
   const date=entry.date;
   const newGroup=date!==previousDate;
   previousDate=date;
@@ -82,12 +110,13 @@ function renderActivity(){
 function summarizeMonth(entries,month){
  let income=0,spent=0;
  const categories=new Map();
+ const entriesById=new Map(entries.map(entry=>[entry.id,entry]));
  for(const entry of entries){
-  if(!entry.date.startsWith(month)||transactionType(entry)==='transfer')continue;
-  if(entry.amount>0)income+=entry.amount;
-  if(entry.amount<0){
-   spent-=entry.amount;
-   categories.set(entry.category,(categories.get(entry.category)||0)-entry.amount);
+  if(!entry.date.startsWith(month))continue;
+  if(transactionType(entry)==='income')income+=entry.amount;
+  for(const [category,change] of spendingChanges(entry,entriesById)){
+   spent+=change;
+   categories.set(category,(categories.get(category)||0)+change);
   }
  }
  return {income,spent,categories};
@@ -125,6 +154,8 @@ const monthLabel=new Intl.DateTimeFormat('en-PH',{month:'short',timeZone:'UTC'})
 const fullMonthLabel=new Intl.DateTimeFormat('en-PH',{month:'long',year:'numeric',timeZone:'UTC'});
 
 function renderTrend(entries,month){
+ const container=$('spendingTrend');
+ if(amountsHidden()){container.innerHTML=hint('Amounts are hidden.');return}
  const [year,monthNumber]=month.split('-').map(Number);
  const periods=Array.from({length:6},(_,index)=>{
   const date=new Date(0);
@@ -132,13 +163,12 @@ function renderTrend(entries,month){
   return {date,key:date.toISOString().slice(0,7),amount:0};
  });
  const byMonth=new Map(periods.map(period=>[period.key,period]));
+ const entriesById=new Map(entries.map(entry=>[entry.id,entry]));
  for(const entry of entries){
-  if(entry.amount>=0||transactionType(entry)==='transfer')continue;
   const period=byMonth.get(entry.date.slice(0,7));
-  if(period)period.amount-=entry.amount;
+  if(period)for(const [,change] of spendingChanges(entry,entriesById))period.amount+=change;
  }
- const maximum=Math.max(...periods.map(period=>period.amount));
- const container=$('spendingTrend');
+ const maximum=Math.max(...periods.map(period=>Math.abs(period.amount)));
  if(!maximum){
   container.innerHTML=hint('Your expenses for this period will appear here.');
   return;
@@ -146,12 +176,12 @@ function renderTrend(entries,month){
  const bars=periods.map(period=>{
   const label=fullMonthLabel.format(period.date);
   const value=money(period.amount);
-  return '<div class="trend-month" title="'+escapeText(label+': '+value)+'">'+
-   '<div class="trend-track"><span class="'+(period.key===month?'is-selected':'')+'" style="height:'+(100*period.amount/maximum)+'%"></span></div>'+
-   '<span>'+escapeText(monthLabel.format(period.date))+'</span></div>';
+  return '<button type="button" class="trend-month" data-chart-month="'+period.key+'" aria-label="'+escapeText('View transactions for '+label+' · Net spending '+value)+'">'+
+   '<span class="trend-track" aria-hidden="true"><span class="'+(period.amount<0?'refund-month':period.key===month?'is-selected':'')+'" style="height:'+(100*Math.abs(period.amount)/maximum)+'%"></span></span>'+
+   '<span aria-hidden="true">'+escapeText(monthLabel.format(period.date))+'</span></button>';
  }).join('');
  const rows=periods.map(period=>row(fullMonthLabel.format(period.date),'',money(period.amount))).join('');
- container.innerHTML='<div class="trend-chart" aria-hidden="true">'+bars+'</div>'+
+ container.innerHTML='<div class="trend-chart" aria-label="Net spending by month">'+bars+'</div>'+
   '<details class="trend-values"><summary>View monthly totals</summary>'+rows+'</details>';
 }
 
@@ -162,9 +192,51 @@ function renderRecent(entries,accounts){
  $('recentEntries').innerHTML=recent.map(entry=>{
   const kind=transactionType(entry);
   const description=accountNames.get(entry.account)||'';
-  const detail=[entry.date,description,kind==='transfer'?'Transfer':entry.category].filter(Boolean).join(' · ');
-  return row(entry.description,detail,(kind==='income'?'+':'')+money(entry.amount));
+  const detail=[entry.date,description,kind==='transfer'?'Transfer':kind==='refund'?'Linked refund':entry.splits?.length?'Split expense':entry.category].filter(Boolean).join(' · ');
+  return row(entry.description,detail,(!amountsHidden()&&(kind==='income'||kind==='refund')?'+':'')+money(entry.amount));
  }).join('')||hint('No transactions for the reporting month.');
+}
+
+function openFilteredActivity(month,category=''){
+ $('month').value=month;
+ $('activityRange').value='month';
+ $('activityRange').dispatchEvent(new Event('change'));
+ $('activitySearch').value='';
+ accountFilter.value='';
+ $('activityType').value='';
+ activity.category=category;
+ activity.page=0;
+ render();
+ location.hash='activity';
+}
+$('spendingTrend').onclick=event=>{
+ const button=event.target.closest('[data-chart-month]');
+ if(button)openFilteredActivity(button.dataset.chartMonth);
+};
+$('categories').onclick=event=>{
+ const button=event.target.closest('[data-chart-category]');
+ if(button)openFilteredActivity($('month').value,button.dataset.chartCategory);
+};
+
+function renderMonthComparison(current,month){
+ const out=$('monthComparison');
+ out.textContent='';
+ if(amountsHidden())return;
+ const [year,number]=month.split('-').map(Number);
+ const date=new Date(0);
+ date.setUTCFullYear(year,number-2,1);
+ const previous=summarizeMonth(db.entries,date.toISOString().slice(0,7));
+ if(!previous.categories.size&&!current.categories.size)return;
+ const names=new Set([...previous.categories.keys(),...current.categories.keys()]);
+ let largest=null;
+ for(const name of names){
+  const change=(current.categories.get(name)||0)-(previous.categories.get(name)||0);
+  if(change&&(!largest||Math.abs(change)>Math.abs(largest.change)))largest={name,change};
+ }
+ const delta=current.spent-previous.spent;
+ const compared=' vs '+fullMonthLabel.format(date)+'.';
+ const overview=delta?'Net spending '+(delta>0?'rose ':'fell ')+money(Math.abs(delta))+compared:'Net spending is unchanged'+compared;
+ out.textContent=overview+(largest?' Biggest change: '+largest.name+' '+(largest.change>0?'up ':'down ')+money(Math.abs(largest.change))+'.':'');
 }
 
 function render(){
@@ -180,15 +252,21 @@ function render(){
  $('total').textContent=money([...balances.values()].reduce((a,b)=>a+b,0));
  $('count').textContent=db.accounts.length+' tracked account'+(db.accounts.length===1?'':'s');
  $('accountList').innerHTML=db.accounts.map(a=>row(a.name,a.type,money(balances.get(a.id)))).join('')||hint('Add a bank account, e-wallet, or cash wallet with its opening balance.');
- const {income,spent,categories}=summarizeMonth(db.entries,$('month').value);
+ const month=$('month').value;
+ const summary=summarizeMonth(db.entries,month);
+ const {income,spent,categories}=summary;
  $('income').textContent=money(income);
  $('spent').textContent=money(spent);
  $('netFlow').textContent=money(income-spent);
  $('netFlow').dataset.direction=income<spent?'negative':income>spent?'positive':'neutral';
+ const positiveTotal=[...categories.values()].reduce((sum,value)=>sum+Math.max(0,value),0);
  $('categories').innerHTML=[...categories].sort((a,b)=>b[1]-a[1]).map(([category,value])=>{
-  const percent=Math.round(100*value/spent);
-  return '<div class="category"><div><span>'+escapeText(category)+'</span><strong>'+escapeText(money(value))+'</strong><small>'+percent+'%</small></div><progress aria-label="'+escapeText(category+' share of spending')+'" value="'+value+'" max="'+spent+'"></progress></div>';
+  const label='<button type="button" class="category-link" data-chart-category="'+escapeText(category)+'">'+escapeText(category)+'</button>';
+  const pg=value>0&&!amountsHidden()?'<progress aria-label="'+escapeText(category+' share of positive spending')+'" value="'+value+'" max="'+positiveTotal+'"></progress>':'';
+  const share=pg?Math.round(100*value/positiveTotal)+'%':'';
+  return '<div class="category"><div>'+label+'<strong>'+escapeText(money(value))+'</strong><small>'+share+'</small></div>'+pg+'</div>';
  }).join('')||hint('Expense categories will appear here for the reporting month.');
+ renderMonthComparison(summary,month);
  renderActivity();
  renderTrend(db.entries,$('month').value);
  renderRecent(db.entries,db.accounts);
@@ -209,8 +287,10 @@ for(const id of ['activityRange','activityAccount','activityType'])$(id).onchang
 $('clearActivity').onclick=()=>{
  $('activitySearch').value='';
  $('activityRange').value='month';
+ $('activityRange').dispatchEvent(new Event('change'));
  accountFilter.value='';
  $('activityType').value='';
+ activity.category='';
  resetActivityPage();
  $('activitySearch').focus();
 };
@@ -254,6 +334,9 @@ $('form').onsubmit=async ev=>{ev.preventDefault();$('save').disabled=true;
  if(mode==='account'){const name=$('name').value.trim();if(!name)throw Error('Enter an account name.');next.accounts.push({id:crypto.randomUUID(),name,type:$('type').value,opening:cents($('opening').value)})}
  if(mode==='entry'){const account=$('acct').value,kind=$('kind').value,to=kind==='Transfer'?$('to').value:null;if(to===account)throw Error('Choose a different destination account.');const description=$('desc').value.trim();if(!description)throw Error('Enter a description.');const record={account,to,description,date:$('date').value,category:$('cat').value.trim()||'Other',amount:cents($('amount').value)*(kind==='Income'?1:-1)};
  const ref=$('receiptRef');if(ref){record.reference=ref.value.trim();if(record.reference&&next.entries.some(e=>e.id!==editId&&sameReference(e.reference,record.reference))&&!$('allowDuplicate').checked)throw Error('This reference already exists. Check Keep separate to save it anyway.')}
+ const original=next.entries.find(entry=>entry.id===editId);
+ if(original?.subscriptionId&&kind!=='Expense')throw Error('A recorded subscription renewal must stay an expense.');
+ window.saldoTransactionTools?.applyDraft(record,next,editId);
  if(editId){oldEntries=structuredClone(next.entries);const existing=next.entries.find(e=>e.id===editId);if(!existing)throw Error('Entry no longer exists.');if(existing.link&&(record.account!==existing.account||record.amount!==existing.amount||record.to||record.date!==existing.date)){const other=next.entries.find(e=>e.id===existing.link);if(other)delete other.link;delete existing.link}Object.assign(existing,record)}else next.entries.unshift(record)}
  if(batch){const known=new Set([...next.ignored,...next.entries.map(e=>e.key)]);const fresh=batch.filter(e=>!known.has(e.key));if(!fresh.length)throw Error('All rows have already been imported.');next.entries.push(...fresh)}
  for(const e of next.entries)e.id??=crypto.randomUUID();await saveLedger(next);db=next;if(oldEntries)undo={version:window.saldoAccount.version,entries:oldEntries}});

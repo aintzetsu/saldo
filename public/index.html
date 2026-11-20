@@ -5,6 +5,7 @@
  <meta name="viewport" content="width=device-width, initial-scale=1">
  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://descopecdn.com https://static.descope.com; worker-src 'self'; img-src 'self' blob: data: https://static.descope.com https://descopecdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://api.descope.com https://static.descope.com https://descopecdn.com; font-src 'self' data: https://fonts.gstatic.com https://descopecdn.com; form-action 'none'; object-src 'none'; base-uri 'none'">
  <title>Saldo · Personal finance</title>
+ <script src="/theme.js"></script>
  <link rel="stylesheet" href="style.css">
  <link rel="stylesheet" href="/login.css">
  <script src="/assets/passkey.js" defer></script>
@@ -13,7 +14,7 @@
 <body>
  <header class="site-header">
   <div class="site-header-inner">
-   <div class="brand"><span class="mark" aria-hidden="true">◒</span>saldo</div>
+   <div class="brand"><button type="button" class="mark" id="themeToggle" aria-label="Dark mode" aria-pressed="false" title="Toggle dark mode">◒</button><span>saldo</span></div>
    <nav class="ledger-nav" aria-label="Ledger">
     <a href="#overview">Overview</a>
     <a href="#accounts">Accounts</a>
@@ -85,7 +86,8 @@
    <h1 id="viewTitle" tabindex="-1">Money overview</h1>
    <div class="actions">
     <button id="startLedger" hidden>Add your first account</button>
-    <button id="quick" class="light" hidden>Quick expense</button>
+    <button type="button" class="light" id="privacyToggle" aria-pressed="false">Hide amounts</button>
+    <button id="quick" class="light" aria-keyshortcuts="Alt+Shift+E" hidden>Quick expense</button>
     <button id="newEntry" hidden>Add transaction</button>
    </div>
   </div>
@@ -115,6 +117,7 @@
     </dl>
     <h3 class="subheading">Spending by category</h3>
     <div id="categories"></div>
+    <div id="monthComparison"></div>
    </article>
    <article id="accounts" aria-labelledby="accounts-title">
     <div class="heading">
@@ -149,10 +152,11 @@
     <label>Search<input id="activitySearch" type="search" placeholder="Description, category, or reference"></label>
     <label>Date range<select id="activityRange"><option value="month">Reporting month</option><option value="all">All dates</option></select></label>
     <label>Account<select id="activityAccount"><option value="">All accounts</option></select></label>
-    <label>Type<select id="activityType"><option value="">All types</option><option value="expense">Expenses</option><option value="income">Income</option><option value="transfer">Transfers</option></select></label>
+    <label>Type<select id="activityType"><option value="">All types</option><option value="expense">Expenses</option><option value="refund">Refunds</option><option value="income">Income</option><option value="transfer">Transfers</option></select></label>
    </div>
    <div class="activity-meta">
     <p id="activityCount" role="status"></p>
+    <span id="categoryFilterStatus" class="filter-chip" hidden></span>
     <button type="button" class="light" id="clearActivity" hidden>Clear filters</button>
     <button type="button" class="light" id="undoEdit" hidden>Undo last edit</button>
    </div>
@@ -194,6 +198,10 @@
   </section>
 
   <article class="tools" data-view="settings">
+   <div class="heading"><h2>Appearance</h2></div>
+   <label class="theme-setting">Theme<select id="themePreference"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+  </article>
+  <article class="tools" data-view="settings">
    <div class="heading"><h2>Account tools</h2></div>
    <div class="actions">
     <button id="passRegister" class="light">Add a passkey</button>
@@ -203,7 +211,7 @@
    <details><summary>Link an email address</summary><button type="button" id="linkEmailStart">Verify email</button><div id="linkEmailFlow"></div></details>
    <p id="toolStatus" role="status"></p>
   </article>
-  <footer data-view="settings">Save a <a href="?quick=expense">Quick expense</a> bookmark to open the expense form directly.</footer>
+  <footer data-view="settings">Save a <a href="?quick=expense">Quick expense</a> bookmark to open the expense form directly, or press <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd>.</footer>
  </main>
  <dialog>
  <form id="form">
@@ -221,4 +229,3 @@
  </dialog>
  </body>
  </html>
-

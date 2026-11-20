@@ -20,8 +20,9 @@ function dueDates(s,month){
 }
 function* candidates(state){
  const groups=new Map(),dismissed=new Set(state.dismissed);
+ const purchasesWithRefunds=new Set(state.entries.map(entry=>entry.refundOf).filter(Boolean));
  for(const e of state.entries){
-  if(e.to||e.link)continue;
+  if(e.to||e.link||e.refundOf||e.splits?.length||e.subscriptionId||purchasesWithRefunds.has(e.id))continue;
   const size=Math.abs(e.amount),group=groups.get(size)||[];
   for(const a of group){
    const days=Math.abs(Date.parse(e.date)-Date.parse(a.date))/day;
@@ -50,11 +51,15 @@ function resolvePair(state,key,action){
 }
 function weekly(state,date){
  const [start,end]=week(date),cats=new Map();let spent=0;
- for(const e of state.entries){
-  if(e.date<start||e.date>end||e.amount>=0||e.to||e.link)continue;
-  spent-=e.amount;cats.set(e.category,(cats.get(e.category)||0)-e.amount);
+ const entriesById=new Map(state.entries.map(entry=>[entry.id,entry]));
+ for(const entry of state.entries){
+  if(entry.date<start||entry.date>end)continue;
+  for(const [category,change] of spendingChanges(entry,entriesById)){
+   spent+=change;
+   cats.set(category,(cats.get(category)||0)+change);
+  }
  }
- return {start,end,spent,top:[...cats].sort((a,b)=>b[1]-a[1])[0]};
+ return {start,end,spent,top:[...cats].filter(([,value])=>value>0).sort((a,b)=>b[1]-a[1])[0]};
 }
 async function update(fn){
  await navigator.locks.request(dbKey,async()=>{const next=read();fn(next);await saveLedger(next);db=next});render();

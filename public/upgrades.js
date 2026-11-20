@@ -27,22 +27,40 @@ function validateBackup(file){
  const str=x=>typeof x==='string',num=Number.isSafeInteger,dt=x=>str(x)&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x;
  for(const list of [s?.accounts,s?.entries,s?.subs??[]])if(!Array.isArray(list)||list.some(x=>!validId(x?.id))||new Set(list.map(x=>x.id)).size!==list.length)reject();
  const accounts=new Set(s.accounts.map(a=>a.id)),entries=new Set(s.entries.map(e=>e.id));
- if(s.accounts.some(a=>!str(a.name)||!str(a.type)||!num(a.opening)))reject();
+ if(s.accounts.some(a=>!str(a.name)||!str(a.type)||!num(a.opening)||(a.archived!=null&&typeof a.archived!=='boolean')))reject();
  if(s.entries.some(e=>!accounts.has(e.account)||!dt(e.date)||!num(e.amount)||!str(e.category)||!str(e.description)||(e.to&&(!accounts.has(e.to)||e.to===e.account))||(e.link&&!entries.has(e.link))||(e.reference&&!str(e.reference))))reject();
  if((s.subs??[]).some(x=>!str(x.name)||!accounts.has(x.account)||!dt(x.start)||!num(x.amount)||!['Monthly','Weekly','Yearly'].includes(x.freq)))reject();
  if(s.budget!=null&&!num(s.budget))reject();
  for(const [id,c] of Object.entries(s.checks??{}))if(!accounts.has(id)||!dt(c?.date)||!num(c.expected)||!num(c.actual))reject();
  for(const list of [s.dismissed??[],s.ignored??[]])if(!Array.isArray(list)||list.some(x=>!str(x)))reject();
+ if(window.saldoTransactionTools?.validateEntries(s.entries)===false)reject();
+ window.saldoTransactionTools?.validateMappings(s.csvMappings);
+ if(s.quickExpenseAccount!=null&&!accounts.has(s.quickExpenseAccount))reject();
+ if(s.reconciliations!=null&&(Array.isArray(s.reconciliations)||typeof s.reconciliations!=='object'||
+  Object.entries(s.reconciliations).some(([id,record])=>!accounts.has(id)||!dt(record?.date)||!num(record.actual)||
+    !Array.isArray(record.ids)||record.ids.some(x=>!validId(x))||new Set(record.ids).size!==record.ids.length)))reject();
+ if(window.saldoPlanningTools?.validateBackup(s)===false)reject();
  return s;
 }
 function mergeBackup(target,source){
  const counts=[];
  for(const field of ['accounts','entries','subs']){
-  const ids=new Set(target[field].map(x=>x.id)),added=(source[field]||[]).filter(x=>!ids.has(x.id));
+  const ids=new Set(target[field].map(x=>x.id));
+  const renewals=field==='entries'?new Set(target.entries.filter(entry=>entry.subscriptionId).map(entry=>JSON.stringify([entry.subscriptionId,entry.renewalDate]))):null;
+  const added=(source[field]||[]).filter(entry=>!ids.has(entry.id)&&(!renewals||!entry.subscriptionId||!renewals.has(JSON.stringify([entry.subscriptionId,entry.renewalDate]))));
   target[field].push(...added);counts.push(added.length);
  }
  target.checks={...source.checks,...target.checks};target.budget??=source.budget;
  for(const key of ['ignored','dismissed'])target[key]=[...new Set([...target[key],...(source[key]||[])])];
+ if(source.quickExpenseAccount&&!target.quickExpenseAccount)target.quickExpenseAccount=source.quickExpenseAccount;
+ if(source.reconciliations)target.reconciliations={...source.reconciliations,...target.reconciliations};
+ if(source.csvMappings?.length){
+  const presets=new Map(source.csvMappings.map(preset=>[preset.name.toLowerCase(),preset]));
+  for(const preset of target.csvMappings||[])presets.set(preset.name.toLowerCase(),preset);
+  target.csvMappings=[...presets.values()].slice(-30);
+ }
+ window.saldoPlanningTools?.mergeBackup(target,source);
+ if(window.saldoTransactionTools?.validateEntries(target.entries)===false)throw Error('This backup conflicts with the split or refund details in your existing ledger.');
  return counts;
 }
 $('exportLedger').onclick=()=>{

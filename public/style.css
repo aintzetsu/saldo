@@ -346,3 +346,112 @@ body:has(#overview:not([hidden])) #logout:hover { background: #ffffff12; }
  #overview .intro { gap: 10px; }
  #overview .balance { margin-top: 12px; }
 }
+
+/* Ledger preferences and insights */
+button.mark {
+ min-width: 36px;
+ min-height: 36px;
+ padding: 0;
+ border-color: transparent;
+ line-height: 1;
+}
+button.mark:hover:not(:disabled) { background: #26674e; }
+body:has(#overview:not([hidden])) button.mark:hover:not(:disabled) { background: #e7f5bb; }
+button.mark:focus-visible { outline-offset: 4px; }
+body:has(#overview:not([hidden])) button.mark:focus-visible { outline-color: #d7ef96; }
+.theme-setting { max-width: 220px; }
+.filter-chip { border-radius: 16px; padding: 5px 9px; background: var(--green-light); font-size: .8rem; }
+.category-link {
+ display: inline;
+ width: fit-content;
+ min-height: 32px;
+ padding: 2px 0;
+ border: 0;
+ background: transparent;
+ color: var(--text);
+ text-align: start;
+ text-decoration: underline;
+ text-underline-offset: 3px;
+}
+.category-link:hover:not(:disabled) { background: transparent; color: var(--green); }
+button.trend-month {
+ background: transparent;
+ padding: 3px;
+ border: 1px solid transparent;
+ font-size: .75rem;
+}
+button.trend-month:hover:not(:disabled) {
+ background: var(--green-light);
+ border-color: var(--line);
+}
+.trend-track .refund-month { background: #a26059; }
+#monthComparison:not(:empty) { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: .875rem; line-height: 1.45; }
+kbd { padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; }
+dialog { background: var(--surface); }
+:root[data-theme="dark"] {
+ color-scheme: dark;
+ --canvas: #111b17;
+ --surface: #192923;
+ --text: #edf5ee;
+ --muted: #aec4b6;
+ --line: #385245;
+ --green: #397452;
+ --green-dark: #2a5842;
+ --green-light: #263f32;
+ --error: #ffaea6;
+}
+:root[data-theme="dark"] body:has(#overview:not([hidden])) { background: var(--canvas); }
+:root[data-theme="dark"] a,
+:root[data-theme="dark"] .light { color: #c5e5c7; }
+:root[data-theme="dark"] .ledger-nav a[aria-current="page"],
+:root[data-theme="dark"] #overview #startLedger,
+:root[data-theme="dark"] #overview #newEntry { color: #20331c; }
+:root[data-theme="dark"] :is(input,select,textarea) { border-color: #547262; }
+:root[data-theme="dark"] [data-direction=positive],
+:root[data-theme="dark"] .transaction-value.income { color: #b1da89; }
+:root[data-theme="dark"] .trend-track {
+ background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), #395749 calc(25% - 1px) 25%);
+}
+:root[data-theme="dark"] .trend-track .is-selected { background: #d7ef96; }
+:root[data-theme="dark"] #dupLabel { color: #f6c78d; }
+:root[data-theme="dark"] #gate {
+ --surface: #192923;
+ --text: #edf5ee;
+ --muted: #aec4b6;
+ --line: #385245;
+ --green: #c5e5c7;
+ --green-dark: #edf5ee;
+ --green-light: #263f32;
+}
+:root[data-theme="dark"] #gate .showcase-ledger { color: #172c24; }
+:root[data-theme="dark"] #gate .text-action { color: #c5e5c7; }
+:root[data-theme="dark"] #gate .email-action { color: #20331c; }
+:root[data-theme="dark"] #gate .light { color: #c5e5c7; }
+@media (max-width: 470px) {
+ #privacyToggle { flex: 1 1 100%; }
+}
+
+/* Account and planning controls */
+.account-record { flex-wrap: wrap; }
+.account-record-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 1 1 160px; text-underline-offset: 3px; }
+.account-record-actions { gap: 6px; }
+.compact-account-list .account-record-actions { display: none; }
+.running-balance { display: block; margin-top: 3px; color: var(--muted); }
+.checklist { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-left: 22px; }
+.checklist-status { color: var(--muted); font-size: .875rem; }
+#saldoSaveNotice { padding: 10px 12px; border-radius: 10px; background: var(--green-light); }
+.check-control, .check-label, .reconcile-line { display: flex; align-items: center; gap: 8px; }
+.reconcile-line > span { flex: 1; }
+.reconcile-line small { display: block; color: var(--muted); }
+.reconcile-list { max-height: 33vh; overflow: auto; }
+.split-part { align-items: end; gap: 6px; }
+.split-part label { flex: 1 1 110px; margin-block: 5px; }
+.planning-meter { margin-top: 12px; }
+.planning-meter .row { flex-wrap: wrap; }
+.planning-meter .card-note { margin-top: 5px; }
+:root[data-privacy="on"] #overview progress { display: none; }
+@media (max-width: 470px) {
+ #planningTools .row { flex-wrap: wrap; }
+ .account-record-actions button { padding-inline: 9px; }
+ button.mark { min-height: 40px; min-width: 40px; }
+}

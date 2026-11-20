@@ -15,7 +15,7 @@ async function saveLedger(data){
 async function start(){
  try{
   window.saldoAccount=await accountRequest();
-  for(const name of ['app','features','upgrades']){
+  for(const name of ['app','features','upgrades','account-experience','transaction-experience','planning-experience']){
    await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/'+name+'.js';script.onload=resolve;script.onerror=reject;document.head.append(script)});
   }
   gate.hidden=true;element('overview').hidden=false;element('logout').hidden=false;
