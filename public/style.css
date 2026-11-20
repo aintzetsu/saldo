@@ -455,3 +455,11 @@ dialog { background: var(--surface); }
  .account-record-actions button { padding-inline: 9px; }
  button.mark { min-height: 40px; min-width: 40px; }
 }
+
+/* Activity Inbox */
+#activityInbox .row { flex-wrap: wrap; }
+#activityInbox .row > span { flex: 1 1 180px; }
+#activityInbox [role="status"]:not(:empty) { margin-top: 8px; }
+#activityInbox :is(code, pre) { white-space: pre-wrap; overflow-wrap: anywhere; }
+.inbox-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,230px),1fr)); gap: 12px; }
+.inbox-instructions { font-size: .875rem; line-height: 1.55; padding-inline-start: 20px; }

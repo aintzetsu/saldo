@@ -66,7 +66,8 @@ function mergeBackup(target,source){
  return counts;
 }
 $('exportLedger').onclick=()=>{
- const backup={format:'saldo-backup-v1',ledger:read()};
+ const {trackingInbox,...ledger}=read();
+ const backup={format:'saldo-backup-v1',ledger};
  const file=new Blob([JSON.stringify(backup)],{type:'application/json'});
  const url=URL.createObjectURL(file);
  const link=document.createElement('a');

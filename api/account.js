@@ -1,4 +1,5 @@
 import {emailAuth} from '../lib/email-auth.js';
+import {captureInbox,manageInbox,isInboxAction,protectInboxSave,publicInboxLedger} from '../lib/inbox.js';
 import {passkeys} from '../lib/passkeys.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { get, put, del, BlobPreconditionFailedError } from '@vercel/blob';
@@ -24,6 +25,7 @@ export default async function handler(req,res){
  const fail=(status,error)=>res.status(status).json({error});
  try{
   if(!['GET','POST'].includes(req.method))return fail(405,'Unsupported method.');
+  if(req.method==='POST'&&req.body?.action==='inboxCapture')return await captureInbox({req,res,fetchDoc,put,privateBlob,fail});
   if(req.method==='POST'&&(req.headers.origin!=='https://'+req.headers.host||!req.headers['content-type']?.startsWith('application/json')))return fail(403,'Open Saldo to make changes.');
   const body=req.body||{},op=req.method==='GET'?'load':body.action;
   const keyFlow=owner=>passkeys({req,res,op,owner,fetchDoc,put,privateBlob,hash,token,signIn});
@@ -47,12 +49,20 @@ export default async function handler(req,res){
   if(!session||session.data.until<=Date.now())return fail(401,'Your session expired. Sign in again.');
   if(op==='registerOptions'||op==='registerFinish')return await keyFlow(session.data.owner);
   if(op==='emailLink')return await emailFlow(session.data.owner);
-  const ledger='ledgers/'+session.data.owner;
-  if(op==='load'){const doc=await fetchDoc(ledger);return res.json({...doc,owner:session.data.owner})}
+  const owner=session.data.owner;
+  const ledger='ledgers/'+owner;
+  if(isInboxAction(op))return await manageInbox({req,res,owner,fetchDoc,put,privateBlob,fail});
+  if(op==='load'){
+   const doc=await fetchDoc(ledger);
+   if(!doc)return fail(404,'Your ledger could not be found.');
+   return res.json({data:publicInboxLedger(doc.data),version:doc.version,owner});
+  }
   if(op!=='save')return fail(400,'Unknown action.');
   if(body.owner!==session.data.owner)return fail(409,'The signed-in account changed. Reload Saldo.');
   if(typeof body.version!=='string'||!body.version||!Array.isArray(body.data?.accounts)||!Array.isArray(body.data?.entries))return fail(400,'Invalid ledger.');
-  const json=JSON.stringify(body.data);
+  const canonical=await fetchDoc(ledger);
+  if(!canonical||canonical.version!==body.version)return fail(409,'Your ledger changed on another device. Refresh Saldo before saving again.');
+  const json=JSON.stringify(protectInboxSave(body.data,canonical.data));
   if(Buffer.byteLength(json)>2000000)return fail(413,'Ledger exceeds the 2 MB account limit.');
   const saved=await put(ledger,json,{...privateBlob,allowOverwrite:true,ifMatch:body.version});
   return res.json({version:saved.etag});

@@ -9,7 +9,8 @@
     "@vercel/blob": "^2.6.0",
     "tesseract.js": "^6.0.1",
     "@descope/node-sdk": "2.19.0",
-    "@descope/web-component": "4.5.2"
+    "@descope/web-component": "4.5.2",
+    "pdfjs-dist": "6.5.438"
   },
   "scripts": {
     "build": "node build.mjs"

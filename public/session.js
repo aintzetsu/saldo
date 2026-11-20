@@ -7,15 +7,41 @@ async function accountRequest(body){
  if(!res.ok){const err=new Error(data.error||'Account request failed.');err.status=res.status;throw err}
  return data;
 }
+const inboxRequest=body=>accountRequest(body);
+function acceptInboxSnapshot(snapshot){
+ if(snapshot.owner!==window.saldoAccount?.owner||typeof snapshot.version!=='string'||
+  !Array.isArray(snapshot.data?.accounts)||!Array.isArray(snapshot.data?.entries)){
+  throw Error('The signed-in account changed. Reload Saldo.');
+ }
+ window.saldoAccount={owner:snapshot.owner,version:snapshot.version,data:snapshot.data};
+ db=read();
+ render();
+}
+
 async function saveLedger(data){
- const {owner,version}=window.saldoAccount;
- const saved=await accountRequest({action:'save',owner,version,data});
+ const {owner,version,data:before}=window.saldoAccount;
+ let saved;
+ try{
+  saved=await accountRequest({action:'save',owner,version,data});
+ }catch(error){
+  if(error.status!==409)throw error;
+  const latest=await accountRequest();
+  const {trackingInbox:previousInbox,...previousLedger}=before;
+  const {trackingInbox:latestInbox,...latestLedger}=latest.data||{};
+  // A draft arriving through Shortcuts should not interrupt an ordinary edit.
+  if(latest.owner!==owner||JSON.stringify(previousLedger)!==JSON.stringify(latestLedger)){
+   throw Error('Your ledger changed. Refresh Saldo and review the latest transactions before saving again.');
+  }
+  if(latestInbox===undefined)delete data.trackingInbox;
+  else data.trackingInbox=latestInbox;
+  saved=await accountRequest({action:'save',owner,version:latest.version,data});
+ }
  window.saldoAccount={owner,version:saved.version,data};
 }
 async function start(){
  try{
   window.saldoAccount=await accountRequest();
-  for(const name of ['app','features','upgrades','account-experience','transaction-experience','planning-experience','tracking-experience']){
+  for(const name of ['app','features','upgrades','account-experience','transaction-experience','planning-experience','tracking-experience','inbox-experience','gcash-import']){
    await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/'+name+'.js';script.onload=resolve;script.onerror=reject;document.head.append(script)});
   }
   gate.hidden=true;element('overview').hidden=false;element('logout').hidden=false;
