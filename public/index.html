@@ -21,32 +21,62 @@
    <button id="logout" class="light private" hidden>Sign out</button>
   </div>
  </header>
- <main id="gate">
-  <article class="signin">
-  <h1>Your Saldo account</h1>
-  <p>Track balances and spending across your accounts in one private ledger.</p>
-  <button type="button" id="emailStart">Continue with email</button>
-  <div id="emailFlow">
-  </div>
-  <form id="loginForm">
-  <button id="passLogin" type="button" class="light">Sign in with a passkey</button>
-  <label>Account key<input id="accountKey" type="password" autocomplete="current-password" required>
-  </label>
-  <button>Sign in</button> <button type="button" class="light" id="register">Create account</button>
-  </form>
-  <section id="enroll" hidden>
-  <h3>Save your account key</h3>
-  <p>Keep this key in your password manager. You’ll need it to sign in on another device. You can link an email address after creating your account.</p>
-  <input id="newKey" aria-label="New account key" readonly>
-  <p>
-  <button class="light" id="copyKey">Copy key</button>
-  </p>
-  <button id="confirmKey">I saved my key · Create account</button> <button class="light" id="cancelKey">Cancel</button>
+ <main id="gate" class="signin-layout">
+  <section class="signin-panel" aria-labelledby="signin-title">
+   <div class="signin-content">
+    <h1 id="signin-title">Sign in to Saldo</h1>
+    <p class="signin-intro">Use your email to sign in or create an account.</p>
+    <div id="signinMethods">
+     <div class="signin-actions">
+      <button type="button" id="emailStart" class="email-action">
+       <span class="mail-icon" aria-hidden="true"></span>
+       <span>Continue with email</span>
+       <span class="action-arrow" aria-hidden="true">→</span>
+      </button>
+      <button type="button" id="passLogin" class="light">Sign in with a passkey</button>
+     </div>
+     <details class="key-options">
+      <summary>Use an account key</summary>
+      <form id="loginForm">
+       <label for="accountKey">Account key</label>
+       <input id="accountKey" type="password" autocomplete="current-password" required>
+       <div class="actions">
+        <button type="submit">Sign in with key</button>
+        <button type="button" class="light" id="register">Create an account key</button>
+       </div>
+      </form>
+      <section id="enroll" hidden>
+       <h3>Save your account key</h3>
+       <p>Keep this key in your password manager. You’ll need it to sign in on another device. You can link an email address later.</p>
+       <input id="newKey" aria-label="New account key" readonly>
+       <div class="actions">
+        <button type="button" class="light" id="copyKey">Copy key</button>
+        <button type="button" id="confirmKey">I saved my key</button>
+        <button type="button" class="text-action" id="cancelKey">Cancel</button>
+       </div>
+      </section>
+     </details>
+    </div>
+    <div id="emailFlow" tabindex="-1"></div>
+    <button type="button" class="text-action" id="emailBack" hidden>← Back to sign-in options</button>
+    <p id="authMsg" role="status"></p>
+   </div>
   </section>
-  <p id="authMsg" role="status">
-  </p>
-  </article>
-  </main>
+  <aside class="signin-showcase" aria-labelledby="showcase-title">
+   <div class="showcase-copy">
+    <h2 id="showcase-title">Your money<br> in one place.</h2>
+    <p>See what’s in your banks, e-wallets, and cash wallets, and track where it goes.</p>
+   </div>
+   <figure class="showcase-ledger">
+    <figcaption>Example ledger</figcaption>
+    <div class="sample-balance"><span>Combined balance</span><strong>₱24,850.00</strong></div>
+    <div class="sample-accounts">
+     <div><span class="sample-mark bank-mark" aria-hidden="true"></span><span>Savings</span><strong>₱20,000.00</strong></div>
+     <div><span class="sample-mark wallet-mark" aria-hidden="true"></span><span>E-wallet</span><strong>₱4,850.00</strong></div>
+    </div>
+   </figure>
+  </aside>
+ </main>
  <main id="overview" hidden>
   <div class="intro">
    <h1>Money overview</h1>

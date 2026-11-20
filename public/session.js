@@ -24,7 +24,7 @@ async function start(){
 const channel=new BroadcastChannel('saldo-sign-in');channel.onmessage=()=>location.reload();
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()});
 async function authenticate(action,key){
- const buttons=gate.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);
+ const buttons=gate.querySelectorAll('button:enabled');buttons.forEach(b=>b.disabled=true);
  try{await accountRequest({action,key});channel.postMessage('changed');location.reload()}
  catch(e){statusLine.textContent=e.message;buttons.forEach(b=>b.disabled=false)}
 }
@@ -33,9 +33,10 @@ element('register').onclick=()=>{
  const bytes=crypto.getRandomValues(new Uint8Array(32));
  element('newKey').value=btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
  element('loginForm').hidden=true;element('enroll').hidden=false;statusLine.textContent='';
+ element('newKey').focus();
 };
 element('copyKey').onclick=async()=>{try{await navigator.clipboard.writeText(element('newKey').value);statusLine.textContent='Key copied.'}catch{element('newKey').select();statusLine.textContent='Copy the selected key.'}};
-element('cancelKey').onclick=()=>{element('newKey').value='';element('enroll').hidden=true;element('loginForm').hidden=false;statusLine.textContent=''};
+element('cancelKey').onclick=()=>{element('newKey').value='';element('enroll').hidden=true;element('loginForm').hidden=false;statusLine.textContent='';element('register').focus()};
 element('confirmKey').onclick=()=>authenticate('create',element('newKey').value);
 element('logout').onclick=async()=>{try{await accountRequest({action:'logout'});channel.postMessage('changed');location.reload()}catch(e){alert(e.message)}};
 start();
@@ -65,6 +66,20 @@ function setupEmailFlow(prefix, linking) {
  const button=element(prefix+'Start');
  const container=element(prefix+'Flow');
  const feedback=linking?element('toolStatus'):statusLine;
+ const back=linking?null:element('emailBack');
+ const reset=()=>{
+  container.replaceChildren();
+  button.disabled=false;
+  if(back){
+   element('signinMethods').hidden=false;
+   back.hidden=true;
+  }
+ };
+ if(back)back.onclick=()=>{
+  reset();
+  feedback.textContent='';
+  button.focus();
+ };
  button.onclick=async()=>{
   button.disabled=true;
   feedback.textContent='Loading sign-in…';
@@ -80,8 +95,21 @@ function setupEmailFlow(prefix, linking) {
    const flow=document.createElement('descope-wc');
    flow.setAttribute('project-id','P3MNeHmHFobNYGhOyAwMzq1cbtKO');
    flow.setAttribute('flow-id','sign-up-or-in');
-   flow.addEventListener('ready',()=>{feedback.textContent=''});
-   flow.addEventListener('error',()=>{feedback.textContent='Email sign-in could not finish. Try again.';button.disabled=false});
+   flow.addEventListener('ready',()=>{
+    feedback.textContent='';
+    if(back){
+     const focusWasInOptions=element('signinMethods').contains(document.activeElement)||document.activeElement===document.body;
+     element('signinMethods').hidden=true;
+     back.hidden=false;
+     if(focusWasInOptions)container.focus();
+    }
+   });
+   flow.addEventListener('error',()=>{
+    const started=back&&!back.hidden;
+    if(!started)reset();
+    feedback.textContent='Email sign-in could not finish. Try again.';
+    if(back&&!started)button.focus();
+   });
    flow.addEventListener('success',async event=>{
     try{
      const sessionToken=event.detail?.sessionJwt;
@@ -95,7 +123,10 @@ function setupEmailFlow(prefix, linking) {
       channel.postMessage('changed');
       location.reload();
      }
-    }catch(error){feedback.textContent=error.message;button.disabled=false}
+    }catch(error){
+     if(!back)reset();
+     feedback.textContent=error.message;
+    }
    });
    container.replaceChildren(flow);
   }catch(error){feedback.textContent=error.message;button.disabled=false}
