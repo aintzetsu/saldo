@@ -9,23 +9,125 @@ let db=read(),mode='',editId=null,undo=null;
 const escapeText=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function row(title,detail,value){return '<div class="row"><span>'+escapeText(title)+'<em>'+escapeText(detail)+'</em></span><b>'+escapeText(value)+'</b></div>'}
 const hint=s=>'<div class="empty">'+s+'</div>';
+const transactionsPerPage=25;
+const activity={page:0,month:''};
+const accountFilter=$('activityAccount');
+
+function transactionType(entry){
+ if(entry.to||entry.link)return 'transfer';
+ return entry.amount>0?'income':'expense';
+}
+
+function filterActivity(entries,{month,account,type,search},accounts){
+ const accountNames=new Map(accounts.map(({id,name})=>[id,name]));
+ const terms=search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+ return entries.filter(entry=>{
+  if(month&&!entry.date.startsWith(month))return false;
+  if(account&&entry.account!==account&&entry.to!==account)return false;
+  if(type&&transactionType(entry)!==type)return false;
+  if(!terms.length)return true;
+  const text=[entry.description,entry.category,entry.reference,entry.date,accountNames.get(entry.account),accountNames.get(entry.to)].join(' ').toLowerCase();
+  return terms.every(term=>text.includes(term));
+ }).sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function renderActivity(){
+ const {accounts,entries}=db;
+ const month=$('month').value;
+ if(activity.month!==month){
+  activity.month=month;
+  activity.page=0;
+ }
+ const selected=accountFilter.value;
+ if(accountFilter.options.length!==accounts.length+1||accounts.some(({id,name},index)=>{
+  const option=accountFilter.options[index+1];
+  return option?.value!==id||option.text!==name;
+ })){
+  accountFilter.replaceChildren(new Option('All accounts',''),...accounts.map(a=>new Option(a.name,a.id)));
+  if(accounts.some(a=>a.id===selected))accountFilter.value=selected;
+ }
+ const account=accountFilter.value,type=$('activityType').value,search=$('activitySearch').value;
+ const allDates=$('activityRange').value==='all';
+ const filtersApplied=Boolean(account||type||search.trim());
+ const matches=filterActivity(entries,{month:allDates?null:month,account,type,search},accounts);
+ const lastPage=Math.max(0,Math.ceil(matches.length/transactionsPerPage)-1);
+ activity.page=Math.min(activity.page,lastPage);
+ const offset=activity.page*transactionsPerPage;
+ const visible=matches.slice(offset,offset+transactionsPerPage);
+ const accountNames=new Map(accounts.map(a=>[a.id,a.name]));
+ const displayCount=matches.length===1?'1 transaction':matches.length+' transactions';
+ $('activityCount').textContent=lastPage?(offset+1)+'–'+(offset+visible.length)+' of '+displayCount:displayCount;
+ $('clearActivity').hidden=!filtersApplied&&!allDates;
+ $('activityPages').hidden=!lastPage;
+ $('previousActivity').disabled=activity.page===0;
+ $('nextActivity').disabled=activity.page===lastPage;
+ $('entries').innerHTML=visible.map(entry=>{
+  const kind=transactionType(entry);
+  const detail=[entry.date,accountNames.get(entry.account),entry.link?'Matched transfer':entry.to?'To '+(accountNames.get(entry.to)||'another account'):entry.category].filter(Boolean).join(' · ');
+  const value=(kind==='income'?'+':'')+money(entry.amount);
+  return '<div class="row transaction"><span>'+escapeText(entry.description)+'<em>'+escapeText(detail)+'</em></span><b class="transaction-value '+kind+'">'+escapeText(value)+'</b><button type="button" class="light" data-edit="'+escapeText(entry.id)+'" aria-label="'+escapeText('Edit '+entry.description)+'">Edit</button></div>';
+ }).join('')||hint(filtersApplied?'No transactions match these filters.':allDates?'Add a transaction to start your history.':'No transactions for the reporting month.');
+ $('undoEdit').hidden=!undo||undo.version!==window.saldoAccount.version;
+}
+
+function summarizeMonth(entries,month){
+ let income=0,spent=0;
+ const categories=new Map();
+ for(const entry of entries){
+  if(!entry.date.startsWith(month)||transactionType(entry)==='transfer')continue;
+  if(entry.amount>0)income+=entry.amount;
+  if(entry.amount<0){
+   spent-=entry.amount;
+   categories.set(entry.category,(categories.get(entry.category)||0)-entry.amount);
+  }
+ }
+ return {income,spent,categories};
+}
+
 function render(){
  const balances=new Map(db.accounts.map(a=>[a.id,a.opening]));
- for(const e of db.entries){balances.set(e.account,balances.get(e.account)+e.amount);if(e.to)balances.set(e.to,balances.get(e.to)-e.amount)}
+ for(const entry of db.entries){
+  if(balances.has(entry.account))balances.set(entry.account,balances.get(entry.account)+entry.amount);
+  if(balances.has(entry.to))balances.set(entry.to,balances.get(entry.to)-entry.amount);
+ }
  $('total').textContent=money([...balances.values()].reduce((a,b)=>a+b,0));
  $('count').textContent=db.accounts.length+' tracked account'+(db.accounts.length===1?'':'s');
- $('accountList').innerHTML=db.accounts.map(a=>row(a.name,a.type+' · Manual',money(balances.get(a.id)))).join('')||hint('Add GCash or a bank account with its opening balance to start your ledger.');
- const entries=db.entries.filter(e=>e.date.startsWith($('month').value)).sort((a,b)=>b.date.localeCompare(a.date));
- let income=0,spent=0;const cats=new Map();
- for(const e of entries){if(e.to||e.link)continue;if(e.amount>0)income+=e.amount;else{spent-=e.amount;cats.set(e.category,(cats.get(e.category)||0)-e.amount)}}
- $('income').textContent=money(income);$('spent').textContent=money(spent);
- $('categories').innerHTML=[...cats].sort((a,b)=>b[1]-a[1]).map(([k,v])=>row(k,Math.round(100*v/spent)+'% of spending',money(v))).join('')||hint('Your expense categories will appear here.');
- const name=id=>db.accounts.find(a=>a.id===id)?.name||'';
- $('entries').innerHTML=entries.map(e=>row(e.description,e.date+' · '+name(e.account)+(e.link?' · Matched transfer':e.to?' → '+name(e.to):' · '+e.category),money(e.amount)).replace('</b></div>','</b><button type="button" class="light" data-edit="'+escapeText(e.id)+'">Edit</button></div>')).join('')||hint('No transactions for this month.');
- $('undoEdit').hidden=!undo||undo.version!==window.saldoAccount.version;
+ $('accountList').innerHTML=db.accounts.map(a=>row(a.name,a.type,money(balances.get(a.id)))).join('')||hint('Add a bank account, e-wallet, or cash wallet with its opening balance.');
+ const {income,spent,categories}=summarizeMonth(db.entries,$('month').value);
+ $('income').textContent=money(income);
+ $('spent').textContent=money(spent);
+ $('netFlow').textContent=money(income-spent);
+ $('netFlow').dataset.direction=income<spent?'negative':income>spent?'positive':'neutral';
+ $('categories').innerHTML=[...categories].sort((a,b)=>b[1]-a[1]).map(([category,value])=>{
+  const percent=Math.round(100*value/spent);
+  return '<div class="category"><div><span>'+escapeText(category)+'</span><strong>'+escapeText(money(value))+'</strong><small>'+percent+'%</small></div><progress aria-label="'+escapeText(category+' share of spending')+'" value="'+value+'" max="'+spent+'"></progress></div>';
+ }).join('')||hint('Expense categories will appear here for the reporting month.');
+ renderActivity();
  if(typeof renderFeatures==='function')renderFeatures();
 }
-$('month').value=today().slice(0,7);$('month').onchange=render;
+
+$('month').value=today().slice(0,7);
+$('month').onchange=()=>{
+ if(!$('month').value)$('month').value=today().slice(0,7);
+ render();
+};
+function resetActivityPage(){
+ activity.page=0;
+ renderActivity();
+}
+$('activitySearch').oninput=resetActivityPage;
+for(const id of ['activityRange','activityAccount','activityType'])$(id).onchange=resetActivityPage;
+$('clearActivity').onclick=()=>{
+ $('activitySearch').value='';
+ $('activityRange').value='month';
+ accountFilter.value='';
+ $('activityType').value='';
+ resetActivityPage();
+ $('activitySearch').focus();
+};
+$('previousActivity').onclick=()=>{activity.page=Math.max(0,activity.page-1);renderActivity()};
+$('nextActivity').onclick=()=>{activity.page++;renderActivity()};
+
 const label=(name,field)=>'<label>'+name+field+'</label>';
 const input=(id,attrs='')=>'<input required id="'+id+'" '+attrs+'>';
 const options=items=>items.map(([value,title])=>'<option value="'+escapeText(value)+'">'+escapeText(title)+'</option>').join('');

@@ -1,3 +1,176 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://descopecdn.com https://static.descope.com; worker-src 'self'; img-src 'self' blob: data: https://static.descope.com https://descopecdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://api.descope.com https://static.descope.com https://descopecdn.com; font-src 'self' data: https://fonts.gstatic.com https://descopecdn.com; form-action 'none'; object-src 'none'; base-uri 'none'"><title>Saldo · Personal finance</title><link rel="stylesheet" href="style.css"><script src="/assets/passkey.js" defer></script><script src="session.js" defer></script></head><body><header><div class="brand"><span class="mark">◒</span> saldo</div><nav><a href="#overview">Overview</a><a href="#accounts">Accounts</a><a href="#activity">Activity</a></nav><button id="logout" class="light private" hidden>Sign out</button></header><main id="gate"><article class="signin"><small>PERSONAL FINANCE</small><h1>Your Saldo account</h1><p>Track balances and spending across your accounts in one private ledger.</p><button type="button" id="emailStart">Continue with email</button><div id="emailFlow"></div><form id="loginForm"><button id="passLogin" type="button" class="light">Sign in with a passkey</button><label>Account key<input id="accountKey" type="password" autocomplete="current-password" required></label><button>Sign in</button> <button type="button" class="light" id="register">Create account</button></form><section id="enroll" hidden><h3>Save your account key</h3><p>Keep this key in your password manager. You’ll need it to sign in on another device. You can link an email address after creating your account.</p><input id="newKey" aria-label="New account key" readonly><p><button class="light" id="copyKey">Copy key</button></p><button id="confirmKey">I saved my key · Create account</button> <button class="light" id="cancelKey">Cancel</button></section><p id="authMsg" role="status"></p></article></main><main id="overview" hidden><div class="intro"><div><small>PERSONAL FINANCE</small><h1>Money overview</h1></div><button id="newEntry">＋ Transaction</button><button id="quick">Quick expense</button></div><section class="balance"><div class="pattern"></div><div class="balcontent"><small>COMBINED BALANCE</small><h2 id="total"></h2><span id="count"></span></div></section><section class="grid"><article><div class="heading"><h3>Cash flow</h3><input id="month" type="month" aria-label="Reporting month" required></div><div class="metrics"><div><small>↙ &nbsp; INCOME</small><strong id="income"></strong></div><div><small>↗ &nbsp; SPENDING</small><strong id="spent"></strong></div></div><h4>Spending by category</h4><div id="categories"></div></article><article id="accounts"><div class="heading"><h3>Accounts</h3><button class="light" id="newAccount">＋ Add</button></div><div id="accountList"></div><button class="light" id="cashBtn">Add cash wallet</button></article></section><section class="grid tools"><article><div class="heading"><h3>Weekly spending</h3><input type="date" id="weekDate" aria-label="Select reporting week"></div><div id="weekly"></div><button id="budgetBtn" class="light">Set weekly budget</button></article><article><div class="heading"><h3>Balance checks</h3><button id="checkBtn" class="light">Check balance</button></div><div id="checks"></div></article></section>
-<article class="tools"><div class="heading"><h3>Subscription calendar</h3><button class="light" id="subBtn">＋ Subscription</button></div><input type="month" id="calMonth" aria-label="Subscription month"><div id="calendar"></div></article>
-<article class="tools"><h3>Transaction review</h3><div id="review"></div></article><article id="activity"><div class="heading"><h3>Transactions</h3><button class="light" id="receiptBtn">Scan receipt</button><button id="importBtn" class="light">Import CSV</button></div><button id="undoEdit" class="light" hidden>Undo last edit</button><div id="entries"></div></article><article class="tools"><h3>Account tools</h3><p><button id="passRegister" class="light">Add a passkey</button> <button id="migrate" class="light">Import old ledger</button></p><details><summary>Link an email address</summary><button type="button" id="linkEmailStart">Verify email</button><div id="linkEmailFlow"></div></details><p id="toolStatus" role="status"></p></article><footer>Records are saved to your signed-in account. On iPhone, bookmark <a href="?quick=expense">Quick expense</a> in Safari or use that link in an Open URLs shortcut.</footer></main><dialog><form id="form"><div class="heading"><h3 id="title"></h3><button type="button" id="close" class="light" aria-label="Close">×</button></div><div id="fields"></div><p id="error" role="alert"></p><button id="save">Save</button></form></dialog></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://descopecdn.com https://static.descope.com; worker-src 'self'; img-src 'self' blob: data: https://static.descope.com https://descopecdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://api.descope.com https://static.descope.com https://descopecdn.com; font-src 'self' data: https://fonts.gstatic.com https://descopecdn.com; form-action 'none'; object-src 'none'; base-uri 'none'">
+ <title>Saldo · Personal finance</title>
+ <link rel="stylesheet" href="style.css">
+ <script src="/assets/passkey.js" defer></script>
+ <script src="session.js" defer></script>
+</head>
+<body>
+ <header class="site-header">
+  <div class="site-header-inner">
+   <div class="brand"><span class="mark" aria-hidden="true">◒</span>saldo</div>
+   <nav aria-label="Ledger">
+    <a href="#overview">Overview</a>
+    <a href="#accounts">Accounts</a>
+    <a href="#activity">Activity</a>
+   </nav>
+   <button id="logout" class="light private" hidden>Sign out</button>
+  </div>
+ </header>
+ <main id="gate">
+  <article class="signin">
+  <h1>Your Saldo account</h1>
+  <p>Track balances and spending across your accounts in one private ledger.</p>
+  <button type="button" id="emailStart">Continue with email</button>
+  <div id="emailFlow">
+  </div>
+  <form id="loginForm">
+  <button id="passLogin" type="button" class="light">Sign in with a passkey</button>
+  <label>Account key<input id="accountKey" type="password" autocomplete="current-password" required>
+  </label>
+  <button>Sign in</button> <button type="button" class="light" id="register">Create account</button>
+  </form>
+  <section id="enroll" hidden>
+  <h3>Save your account key</h3>
+  <p>Keep this key in your password manager. You’ll need it to sign in on another device. You can link an email address after creating your account.</p>
+  <input id="newKey" aria-label="New account key" readonly>
+  <p>
+  <button class="light" id="copyKey">Copy key</button>
+  </p>
+  <button id="confirmKey">I saved my key · Create account</button> <button class="light" id="cancelKey">Cancel</button>
+  </section>
+  <p id="authMsg" role="status">
+  </p>
+  </article>
+  </main>
+ <main id="overview" hidden>
+  <div class="intro">
+   <h1>Money overview</h1>
+   <div class="actions">
+    <button id="quick" class="light">Quick expense</button>
+    <button id="newEntry">Add transaction</button>
+   </div>
+  </div>
+
+  <section class="balance" aria-labelledby="balance-label">
+   <div class="pattern" aria-hidden="true"></div>
+   <div class="balcontent">
+    <h2 id="balance-label">Combined balance</h2>
+    <p id="total"></p>
+    <p id="count"></p>
+   </div>
+  </section>
+
+  <div class="grid dashboard-grid">
+   <article aria-labelledby="cash-flow-title">
+    <div class="heading">
+     <h2 id="cash-flow-title">Cash flow</h2>
+     <label class="period">Reporting month<input id="month" type="month" required></label>
+    </div>
+    <dl class="metrics">
+     <div><dt>Income</dt><dd id="income"></dd></div>
+     <div><dt>Spending</dt><dd id="spent"></dd></div>
+     <div><dt>Net cash flow</dt><dd id="netFlow"></dd></div>
+    </dl>
+    <h3 class="subheading">Spending by category</h3>
+    <div id="categories"></div>
+   </article>
+   <article id="accounts" aria-labelledby="accounts-title">
+    <div class="heading">
+     <h2 id="accounts-title">Accounts</h2>
+     <button class="light" id="newAccount">Add account</button>
+    </div>
+    <div id="accountList"></div>
+    <button class="light" id="cashBtn">Add cash wallet</button>
+   </article>
+  </div>
+
+  <article id="activity" class="tools" aria-labelledby="activity-title">
+   <div class="heading">
+    <h2 id="activity-title">Transactions</h2>
+    <div class="actions">
+     <button class="light" id="receiptBtn">Scan receipt</button>
+     <button class="light" id="importBtn">Import CSV</button>
+    </div>
+   </div>
+   <div class="activity-filters">
+    <label>Search<input id="activitySearch" type="search" placeholder="Description, category, or reference"></label>
+    <label>Date range<select id="activityRange"><option value="month">Reporting month</option><option value="all">All dates</option></select></label>
+    <label>Account<select id="activityAccount"><option value="">All accounts</option></select></label>
+    <label>Type<select id="activityType"><option value="">All types</option><option value="expense">Expenses</option><option value="income">Income</option><option value="transfer">Transfers</option></select></label>
+   </div>
+   <div class="activity-meta">
+    <p id="activityCount" role="status"></p>
+    <button type="button" class="light" id="clearActivity" hidden>Clear filters</button>
+    <button type="button" class="light" id="undoEdit" hidden>Undo last edit</button>
+   </div>
+   <div id="entries"></div>
+   <div id="activityPages" class="actions activity-pages" aria-label="Transaction pages" hidden>
+    <button type="button" class="light" id="previousActivity">Previous</button>
+    <button type="button" class="light" id="nextActivity">Next</button>
+   </div>
+  </article>
+
+  <section class="grid tools" aria-label="Planning and balance checks">
+   <article>
+    <div class="heading"><h2>Weekly spending</h2><input type="date" id="weekDate" aria-label="Select reporting week"></div>
+    <div id="weekly"></div>
+    <button id="budgetBtn" class="light">Set weekly budget</button>
+   </article>
+   <article>
+    <div class="heading"><h2>Balance checks</h2><button id="checkBtn" class="light">Check balance</button></div>
+    <div id="checks"></div>
+   </article>
+  </section>
+  <section class="grid tools" aria-label="Subscriptions and transaction review">
+   <article>
+    <div class="heading"><h2>Subscription calendar</h2><button class="light" id="subBtn">Add subscription</button></div>
+    <input type="month" id="calMonth" aria-label="Subscription month">
+    <div id="calendar"></div>
+   </article>
+   <article>
+    <h2>Transaction review</h2>
+    <details id="reviewDetails">
+     <summary>Review possible duplicates and transfers</summary>
+     <div id="review"></div>
+     <div id="reviewPages" class="actions activity-pages" aria-label="Review pages" hidden>
+      <button id="previousReview" class="light" type="button">Previous</button>
+      <button id="nextReview" class="light" type="button">Next</button>
+     </div>
+    </details>
+   </article>
+  </section>
+
+  <article class="tools">
+   <div class="heading"><h2>Account tools</h2></div>
+   <div class="actions">
+    <button id="passRegister" class="light">Add a passkey</button>
+    <button id="migrate" class="light">Import ledger backup</button>
+    <button id="exportLedger" class="light">Download ledger backup</button>
+   </div>
+   <details><summary>Link an email address</summary><button type="button" id="linkEmailStart">Verify email</button><div id="linkEmailFlow"></div></details>
+   <p id="toolStatus" role="status"></p>
+  </article>
+  <footer>Save a <a href="?quick=expense">Quick expense</a> bookmark to open the expense form directly.</footer>
+ </main>
+ <dialog>
+ <form id="form">
+ <div class="heading">
+ <h3 id="title">
+ </h3>
+ <button type="button" id="close" class="light" aria-label="Close">×</button>
+ </div>
+ <div id="fields">
+ </div>
+ <p id="error" role="alert">
+ </p>
+ <button id="save">Save</button>
+ </form>
+ </dialog>
+ </body>
+ </html>
+

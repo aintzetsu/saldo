@@ -21,7 +21,7 @@ function chooseFile(accept){
  return new Promise(resolve=>{const f=document.createElement('input');f.type='file';f.accept=accept;f.onchange=()=>resolve(f.files[0]);f.oncancel=()=>resolve(null);f.click()});
 }
 function validateBackup(file){
- const reject=()=>{throw Error('Choose a valid JSON export from the original Saldo site.')};
+ const reject=()=>{throw Error('Choose a valid Saldo ledger backup.')};
  if(file?.format!=='saldo-backup-v1')reject();
  const s=file.ledger,validId=x=>typeof x==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(x)&&!(x in Object.prototype);
  const str=x=>typeof x==='string',num=Number.isSafeInteger,dt=x=>str(x)&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x;
@@ -45,9 +45,23 @@ function mergeBackup(target,source){
  for(const key of ['ignored','dismissed'])target[key]=[...new Set([...target[key],...(source[key]||[])])];
  return counts;
 }
+$('exportLedger').onclick=()=>{
+ const backup={format:'saldo-backup-v1',ledger:read()};
+ const file=new Blob([JSON.stringify(backup)],{type:'application/json'});
+ const url=URL.createObjectURL(file);
+ const link=document.createElement('a');
+ link.href=url;
+ link.download='saldo-ledger-'+today()+'.json';
+ document.body.append(link);
+ link.click();
+ link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('toolStatus').textContent='Backup prepared. It contains your ledger data. Store it somewhere private.';
+};
+
 $('migrate').onclick=async()=>{
  try{
-  const file=await chooseFile('.json,application/json');if(!file)return;if(file.size>2000000)throw Error('Choose a backup under 2 MB.');
+  const file=await chooseFile('.json,application/json');if(!file)return;if(file.size>3000000)throw Error('Choose a backup under 3 MB.');
   const source=validateBackup(JSON.parse(await file.text())),counts=mergeBackup(read(),source);
   popup('Preview ledger import',row('Accounts','New records',counts[0])+row('Transactions','New records',counts[1])+row('Subscriptions','New records',counts[2])+hint('Matching record IDs are skipped. Existing budget and balance checks take priority.'),state=>{mergeBackup(state,source)});
  }catch(e){$('toolStatus').textContent=e.message}

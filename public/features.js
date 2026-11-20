@@ -18,8 +18,8 @@ function dueDates(s,month){
  }
  return dates;
 }
-function candidates(state){
- const groups=new Map(),result=[],dismissed=new Set(state.dismissed);
+function* candidates(state){
+ const groups=new Map(),dismissed=new Set(state.dismissed);
  for(const e of state.entries){
   if(e.to||e.link)continue;
   const size=Math.abs(e.amount),group=groups.get(size)||[];
@@ -28,14 +28,16 @@ function candidates(state){
    const dup=e.account===a.account&&e.amount===a.amount&&days===0;
    const transfer=e.account!==a.account&&e.amount===-a.amount&&days<=2;
    const key=JSON.stringify([a.id,e.id].sort());
-   if((dup||transfer)&&!dismissed.has(key))result.push({a,b:e,key,dup});
+   if((dup||transfer)&&!dismissed.has(key))yield {a,b:e,key,dup};
   }
   group.push(e);groups.set(size,group);
  }
- return result;
 }
 function resolvePair(state,key,action){
- const pair=candidates(state).find(p=>p.key===key);
+ let pair;
+ for(const candidate of candidates(state)){
+  if(candidate.key===key){pair=candidate;break}
+ }
  if(!pair)throw Error('This pair has already been reviewed.');
  const {a,b,dup}=pair;
  if(action==='dismiss'){state.dismissed.push(key);return}
@@ -99,9 +101,41 @@ function renderFeatures(){
  const month=$('calMonth').value||today().slice(0,7);
  const dues=db.subs.flatMap(s=>dueDates(s,month).map(date=>({s,date}))).sort((a,b)=>a.date.localeCompare(b.date));
  $('calendar').innerHTML=(dues.length?dues.map(({s,date})=>row(s.name,date+' · '+name(s.account),money(s.amount))).join(''):hint('No renewals scheduled for this month.'))+db.subs.map(s=>'<button class="light" data-sub="'+escapeText(s.id)+'">Edit '+escapeText(s.name)+'</button>').join('');
- const pairs=candidates(db);const detail=e=>escapeText(e.date+' · '+name(e.account)+' · '+e.description+' · '+money(e.amount));
- $('review').innerHTML=pairs.map(({a,b,key,dup})=>'<div class="reviewItem" data-pair="'+escapeText(key)+'"><h4>'+(dup?'Possible duplicate':'Possible transfer')+'</h4><p>1. '+detail(a)+'</p><p>2. '+detail(b)+'</p>'+(dup?'<button data-act="first">Keep first only</button><button data-act="second">Keep second only</button>':'<button data-act="link">Match transfer</button>')+'<button class="light" data-act="dismiss">Keep separate</button></div>').join('')||hint('No potential transfers or duplicates to review.');
+ renderReview();
 }
+
+const reviewPageSize=10;
+let reviewPage=0;
+function readReviewPage(state,page){
+ let skip=page*reviewPageSize;
+ const pairs=[];
+ for(const pair of candidates(state)){
+  if(skip){skip--;continue}
+  pairs.push(pair);
+  if(pairs.length>reviewPageSize)break;
+ }
+ return pairs;
+}
+
+function renderReview(){
+ if(!$('reviewDetails').open)return;
+ let pairs=readReviewPage(db,reviewPage);
+ if(!pairs.length&&reviewPage){
+  reviewPage=0;
+  pairs=readReviewPage(db,reviewPage);
+ }
+ const hasMore=pairs.length>reviewPageSize;
+ $('reviewPages').hidden=!reviewPage&&!hasMore;
+ $('previousReview').disabled=!reviewPage;
+ $('nextReview').disabled=!hasMore;
+ const names=new Map(db.accounts.map(a=>[a.id,a.name]));
+ const detail=e=>escapeText(e.date+' · '+(names.get(e.account)||'')+' · '+e.description+' · '+money(e.amount));
+ $('review').innerHTML=pairs.slice(0,reviewPageSize).map(({a,b,key,dup})=>'<div class="reviewItem" data-pair="'+escapeText(key)+'"><h4>'+(dup?'Possible duplicate':'Possible transfer')+'</h4><p>1. '+detail(a)+'</p><p>2. '+detail(b)+'</p>'+(dup?'<button data-act="first">Keep first only</button><button data-act="second">Keep second only</button>':'<button data-act="link">Match transfer</button>')+'<button class="light" data-act="dismiss">Keep separate</button></div>').join('')||hint('No potential transfers or duplicates to review.');
+}
+$('reviewDetails').ontoggle=renderReview;
+$('previousReview').onclick=()=>{reviewPage=Math.max(0,reviewPage-1);renderReview()};
+$('nextReview').onclick=()=>{reviewPage++;renderReview()};
+
 $('weekDate').value=today();$('calMonth').value=today().slice(0,7);$('weekDate').onchange=$('calMonth').onchange=renderFeatures;
 $('quick').onclick=quickExpense;
 $('cashBtn').onclick=()=>{openForm('account');$('type').value='Cash';$('name').value='Cash wallet';$('opening').focus()};
