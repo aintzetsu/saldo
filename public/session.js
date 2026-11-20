@@ -58,3 +58,66 @@ async function usePasskey(register){
 }
 element('passLogin').onclick=()=>usePasskey(false);
 element('passRegister').onclick=()=>usePasskey(true);
+
+function setupEmailForm(prefix, linking) {
+ const form=element(prefix+'Form');
+ const address=element(prefix+'Address');
+ const send=element(prefix+'Send');
+ const code=element(prefix+'Code');
+ const verify=element(prefix+'Verify');
+ const submit=element(prefix+'Submit');
+ const feedback=linking?element('toolStatus'):statusLine;
+ let sentTo='', readyAt=0, pending=false;
+
+ address.oninput=()=>{
+  verify.hidden=true;
+  code.value='';
+ };
+ send.onclick=async()=>{
+  if(pending||!address.reportValidity())return;
+  if(Date.now()<readyAt){
+   feedback.textContent='Wait 30 seconds after requesting a code before sending another.';
+   return;
+  }
+  pending=true;
+  send.disabled=true;
+  address.readOnly=true;
+  verify.hidden=true;
+  code.value='';
+  try{
+   sentTo=address.value.trim();
+   await accountRequest({action:'emailSend',email:sentTo});
+   readyAt=Date.now()+30000;
+   verify.hidden=false;
+   feedback.textContent='Check your email for a six-digit code.';
+   code.focus();
+  }catch(error){feedback.textContent=error.message}
+  finally{pending=false;send.disabled=false;address.readOnly=false}
+ };
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  if(pending)return;
+  if(verify.hidden){send.click();return}
+  if(!/^[0-9]{6}$/.test(code.value)){
+   feedback.textContent='Enter the six-digit code.';
+   code.focus();
+   return;
+  }
+  pending=true;
+  submit.disabled=true;
+  try{
+   await accountRequest({action:linking?'emailLink':'emailLogin',email:sentTo,code:code.value,owner:linking?window.saldoAccount.owner:undefined});
+   if(linking){
+    form.reset();
+    verify.hidden=true;
+    feedback.textContent='Email linked. You can use it to sign in to this ledger.';
+   }else{
+    channel.postMessage('changed');
+    location.reload();
+   }
+  }catch(error){feedback.textContent=error.message}
+  finally{pending=false;submit.disabled=false}
+ };
+}
+setupEmailForm('email',false);
+setupEmailForm('linkEmail',true);

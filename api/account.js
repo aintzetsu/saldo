@@ -1,3 +1,4 @@
+import {emailAuth} from '../lib/email-auth.js';
 import {passkeys} from '../lib/passkeys.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { get, put, del, BlobPreconditionFailedError } from '@vercel/blob';
@@ -27,6 +28,8 @@ export default async function handler(req,res){
   const body=req.body||{},op=req.method==='GET'?'load':body.action;
   const keyFlow=owner=>passkeys({req,res,op,owner,fetchDoc,put,privateBlob,hash,token,signIn});
   if(op==='authenticateOptions'||op==='authenticateFinish')return await keyFlow(null);
+  const emailFlow=owner=>emailAuth({body,owner,action:op,res,fail,fetchDoc,put,privateBlob,hash,signIn});
+  if(op==='emailSend'||op==='emailLogin')return await emailFlow(null);
   if(op==='create'||op==='login'){
    const key=body.key;
    if(!valid(key))return fail(400,'Enter a valid Saldo account key.');
@@ -43,6 +46,7 @@ export default async function handler(req,res){
   const session=await fetchDoc(path);
   if(!session||session.data.until<=Date.now())return fail(401,'Your session expired. Sign in again.');
   if(op==='registerOptions'||op==='registerFinish')return await keyFlow(session.data.owner);
+  if(op==='emailLink')return await emailFlow(session.data.owner);
   const ledger='ledgers/'+session.data.owner;
   if(op==='load'){const doc=await fetchDoc(ledger);return res.json({...doc,owner:session.data.owner})}
   if(op!=='save')return fail(400,'Unknown action.');
