@@ -29,7 +29,7 @@ export default async function handler(req,res){
   const keyFlow=owner=>passkeys({req,res,op,owner,fetchDoc,put,privateBlob,hash,token,signIn});
   if(op==='authenticateOptions'||op==='authenticateFinish')return await keyFlow(null);
   const emailFlow=owner=>emailAuth({body,owner,action:op,res,fail,fetchDoc,put,privateBlob,hash,signIn});
-  if(op==='emailSend'||op==='emailLogin')return await emailFlow(null);
+  if(op==='emailLogin')return await emailFlow(null);
   if(op==='create'||op==='login'){
    const key=body.key;
    if(!valid(key))return fail(400,'Enter a valid Saldo account key.');

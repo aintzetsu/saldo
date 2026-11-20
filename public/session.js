@@ -59,65 +59,47 @@ async function usePasskey(register){
 element('passLogin').onclick=()=>usePasskey(false);
 element('passRegister').onclick=()=>usePasskey(true);
 
-function setupEmailForm(prefix, linking) {
- const form=element(prefix+'Form');
- const address=element(prefix+'Address');
- const send=element(prefix+'Send');
- const code=element(prefix+'Code');
- const verify=element(prefix+'Verify');
- const submit=element(prefix+'Submit');
- const feedback=linking?element('toolStatus'):statusLine;
- let sentTo='', readyAt=0, pending=false;
 
- address.oninput=()=>{
-  verify.hidden=true;
-  code.value='';
- };
- send.onclick=async()=>{
-  if(pending||!address.reportValidity())return;
-  if(Date.now()<readyAt){
-   feedback.textContent='Wait 30 seconds after requesting a code before sending another.';
-   return;
-  }
-  pending=true;
-  send.disabled=true;
-  address.readOnly=true;
-  verify.hidden=true;
-  code.value='';
+let descopeComponent;
+function setupEmailFlow(prefix, linking) {
+ const button=element(prefix+'Start');
+ const container=element(prefix+'Flow');
+ const feedback=linking?element('toolStatus'):statusLine;
+ button.onclick=async()=>{
+  button.disabled=true;
+  feedback.textContent='Loading sign-in…';
   try{
-   sentTo=address.value.trim();
-   await accountRequest({action:'emailSend',email:sentTo});
-   readyAt=Date.now()+30000;
-   verify.hidden=false;
-   feedback.textContent='Check your email for a six-digit code.';
-   code.focus();
-  }catch(error){feedback.textContent=error.message}
-  finally{pending=false;send.disabled=false;address.readOnly=false}
- };
- form.onsubmit=async event=>{
-  event.preventDefault();
-  if(pending)return;
-  if(verify.hidden){send.click();return}
-  if(!/^[0-9]{6}$/.test(code.value)){
-   feedback.textContent='Enter the six-digit code.';
-   code.focus();
-   return;
-  }
-  pending=true;
-  submit.disabled=true;
-  try{
-   await accountRequest({action:linking?'emailLink':'emailLogin',email:sentTo,code:code.value,owner:linking?window.saldoAccount.owner:undefined});
-   if(linking){
-    form.reset();
-    verify.hidden=true;
-    feedback.textContent='Email linked. You can use it to sign in to this ledger.';
-   }else{
-    channel.postMessage('changed');
-    location.reload();
-   }
-  }catch(error){feedback.textContent=error.message}
-  finally{pending=false;submit.disabled=false}
+   descopeComponent ??= new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='/assets/descope.js';
+    script.onload=resolve;
+    script.onerror=()=>{descopeComponent=undefined;script.remove();reject(Error('Could not load email sign-in. Try again.'))};
+    document.head.append(script);
+   });
+   await descopeComponent;
+   const flow=document.createElement('descope-wc');
+   flow.setAttribute('project-id','P3MNeHmHFobNYGhOyAwMzq1cbtKO');
+   flow.setAttribute('flow-id','sign-up-or-in');
+   flow.addEventListener('ready',()=>{feedback.textContent=''});
+   flow.addEventListener('error',()=>{feedback.textContent='Email sign-in could not finish. Try again.';button.disabled=false});
+   flow.addEventListener('success',async event=>{
+    try{
+     const sessionToken=event.detail?.sessionJwt;
+     if(!sessionToken)throw Error('Email sign-in returned no session. Try again.');
+     await accountRequest({action:linking?'emailLink':'emailLogin',sessionToken,owner:linking?window.saldoAccount.owner:undefined});
+     if(linking){
+      container.replaceChildren();
+      button.disabled=false;
+      feedback.textContent='Email linked. You can use it to sign in to this ledger.';
+     }else{
+      channel.postMessage('changed');
+      location.reload();
+     }
+    }catch(error){feedback.textContent=error.message;button.disabled=false}
+   });
+   container.replaceChildren(flow);
+  }catch(error){feedback.textContent=error.message;button.disabled=false}
  };
 }
-setupEmailForm('email',false);
-setupEmailForm('linkEmail',true);
+setupEmailFlow('email',false);
+setupEmailFlow('linkEmail',true);

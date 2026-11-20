@@ -1,1 +1,17 @@
-{"name":"saldo-ledger","private":true,"type":"module","dependencies":{"@simplewebauthn/browser":"^13.3.0","@simplewebauthn/server":"^13.3.3","@tesseract.js-data/eng":"^1.0.0","@vercel/blob":"^2.6.0","tesseract.js":"^6.0.1"},"scripts":{"build":"node build.mjs"}}
+{
+  "name": "saldo-ledger",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.3",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@vercel/blob": "^2.6.0",
+    "tesseract.js": "^6.0.1",
+    "@descope/node-sdk": "2.19.0",
+    "@descope/web-component": "4.5.2"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}
