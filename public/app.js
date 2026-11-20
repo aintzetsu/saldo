@@ -93,6 +93,80 @@ function summarizeMonth(entries,month){
  return {income,spent,categories};
 }
 
+const views={
+ overview:'Money overview',
+ accounts:'Accounts',
+ activity:'Activity',
+ planning:'Planning',
+ settings:'Settings'
+};
+const menu=[...document.querySelectorAll('.ledger-nav a')];
+const viewPanels=[...document.querySelectorAll('#overview [data-view]')];
+
+function showView(moveFocus=false){
+ const section=location.hash.slice(1);
+ const view=Object.hasOwn(views,section)?section:'overview';
+ $('overview').dataset.currentView=view;
+ $('viewTitle').textContent=views[view];
+ for(const panel of viewPanels)panel.hidden=!panel.dataset.view.split(' ').includes(view);
+ for(const link of menu){
+  if(link.hash==='#'+view)link.setAttribute('aria-current','page');
+  else link.removeAttribute('aria-current');
+ }
+ if(moveFocus){
+  $('viewTitle').focus({preventScroll:true});
+  window.scrollTo(0,0);
+ }
+}
+window.addEventListener('hashchange',()=>showView(true));
+showView();
+
+const monthLabel=new Intl.DateTimeFormat('en-PH',{month:'short',timeZone:'UTC'});
+const fullMonthLabel=new Intl.DateTimeFormat('en-PH',{month:'long',year:'numeric',timeZone:'UTC'});
+
+function renderTrend(entries,month){
+ const [year,monthNumber]=month.split('-').map(Number);
+ const periods=Array.from({length:6},(_,index)=>{
+  const date=new Date(0);
+  date.setUTCFullYear(year,monthNumber-6+index,1);
+  return {date,key:date.toISOString().slice(0,7),amount:0};
+ });
+ const byMonth=new Map(periods.map(period=>[period.key,period]));
+ for(const entry of entries){
+  if(entry.amount>=0||transactionType(entry)==='transfer')continue;
+  const period=byMonth.get(entry.date.slice(0,7));
+  if(period)period.amount-=entry.amount;
+ }
+ const maximum=Math.max(...periods.map(period=>period.amount));
+ const container=$('spendingTrend');
+ if(!maximum){
+  container.innerHTML=hint('Your expenses for this period will appear here.');
+  return;
+ }
+ const bars=periods.map(period=>{
+  const label=fullMonthLabel.format(period.date);
+  const value=money(period.amount);
+  return '<div class="trend-month" title="'+escapeText(label+': '+value)+'">'+
+   '<div class="trend-track"><span class="'+(period.key===month?'is-selected':'')+'" style="height:'+(100*period.amount/maximum)+'%"></span></div>'+
+   '<span>'+escapeText(monthLabel.format(period.date))+'</span></div>';
+ }).join('');
+ const rows=periods.map(period=>row(fullMonthLabel.format(period.date),'',money(period.amount))).join('');
+ container.innerHTML='<div class="trend-chart" aria-hidden="true">'+bars+'</div>'+
+  '<details class="trend-values"><summary>View monthly totals</summary>'+rows+'</details>';
+}
+
+function renderRecent(entries,accounts){
+ const accountNames=new Map(accounts.map(a=>[a.id,a.name]));
+ const month=$('month').value;
+ const recent=entries.filter(entry=>entry.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+ $('recentEntries').innerHTML=recent.map(entry=>{
+  const kind=transactionType(entry);
+  const description=accountNames.get(entry.account)||'';
+  const detail=[entry.date,description,kind==='transfer'?'Transfer':entry.category].filter(Boolean).join(' · ');
+  return row(entry.description,detail,(kind==='income'?'+':'')+money(entry.amount));
+ }).join('')||hint('No transactions for the reporting month.');
+}
+
 function render(){
  const hasAccounts=db.accounts.length>0;
  $('startLedger').hidden=hasAccounts;
@@ -116,6 +190,8 @@ function render(){
   return '<div class="category"><div><span>'+escapeText(category)+'</span><strong>'+escapeText(money(value))+'</strong><small>'+percent+'%</small></div><progress aria-label="'+escapeText(category+' share of spending')+'" value="'+value+'" max="'+spent+'"></progress></div>';
  }).join('')||hint('Expense categories will appear here for the reporting month.');
  renderActivity();
+ renderTrend(db.entries,$('month').value);
+ renderRecent(db.entries,db.accounts);
  if(typeof renderFeatures==='function')renderFeatures();
 }
 

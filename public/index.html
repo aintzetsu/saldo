@@ -14,10 +14,12 @@
  <header class="site-header">
   <div class="site-header-inner">
    <div class="brand"><span class="mark" aria-hidden="true">◒</span>saldo</div>
-   <nav aria-label="Ledger">
+   <nav class="ledger-nav" aria-label="Ledger">
     <a href="#overview">Overview</a>
     <a href="#accounts">Accounts</a>
     <a href="#activity">Activity</a>
+    <a href="#planning">Planning</a>
+    <a href="#settings">Settings</a>
    </nav>
    <button id="logout" class="light private" hidden>Sign out</button>
   </div>
@@ -78,9 +80,9 @@
    </figure>
   </aside>
  </main>
- <main id="overview" hidden>
+ <main id="overview" tabindex="-1" hidden>
   <div class="intro">
-   <h1>Money overview</h1>
+   <h1 id="viewTitle" tabindex="-1">Money overview</h1>
    <div class="actions">
     <button id="startLedger" hidden>Add your first account</button>
     <button id="quick" class="light" hidden>Quick expense</button>
@@ -88,7 +90,7 @@
    </div>
   </div>
 
-  <section class="balance" aria-labelledby="balance-label">
+  <section class="balance" aria-labelledby="balance-label" data-view="overview accounts">
    <div class="pattern" aria-hidden="true"></div>
    <div class="balcontent">
     <h2 id="balance-label">Combined balance</h2>
@@ -97,11 +99,14 @@
    </div>
   </section>
 
-  <div class="grid dashboard-grid">
-   <article aria-labelledby="cash-flow-title">
+  <div class="report-toolbar" data-view="overview activity">
+   <label class="period">Reporting month<input id="month" type="month" required></label>
+  </div>
+
+  <div class="grid dashboard-grid" data-view="overview accounts">
+   <article aria-labelledby="cash-flow-title" data-view="overview">
     <div class="heading">
      <h2 id="cash-flow-title">Cash flow</h2>
-     <label class="period">Reporting month<input id="month" type="month" required></label>
     </div>
     <dl class="metrics">
      <div><dt>Income</dt><dd id="income"></dd></div>
@@ -121,7 +126,18 @@
    </article>
   </div>
 
-  <article id="activity" class="tools" aria-labelledby="activity-title">
+  <div class="grid insights-grid tools" data-view="overview">
+   <article aria-labelledby="trendTitle">
+    <div class="heading"><h2 id="trendTitle">Spending trend</h2><span class="card-note">Six months</span></div>
+    <div id="spendingTrend"></div>
+   </article>
+   <article aria-labelledby="recentTitle">
+    <div class="heading"><h2 id="recentTitle">Recent transactions</h2><a href="#activity">View activity</a></div>
+    <div id="recentEntries"></div>
+   </article>
+  </div>
+
+  <article id="activity" class="tools" aria-labelledby="activity-title" data-view="activity">
    <div class="heading">
     <h2 id="activity-title">Transactions</h2>
     <div class="actions">
@@ -147,7 +163,7 @@
    </div>
   </article>
 
-  <section class="grid tools" aria-label="Planning and balance checks">
+  <section class="grid tools" aria-label="Planning and balance checks" data-view="planning">
    <article>
     <div class="heading"><h2>Weekly spending</h2><input type="date" id="weekDate" aria-label="Select reporting week"></div>
     <div id="weekly"></div>
@@ -158,7 +174,7 @@
     <div id="checks"></div>
    </article>
   </section>
-  <section class="grid tools" aria-label="Subscriptions and transaction review">
+  <section class="grid tools" aria-label="Subscriptions and transaction review" data-view="planning">
    <article>
     <div class="heading"><h2>Subscription calendar</h2><button class="light" id="subBtn">Add subscription</button></div>
     <input type="month" id="calMonth" aria-label="Subscription month">
@@ -177,7 +193,7 @@
    </article>
   </section>
 
-  <article class="tools">
+  <article class="tools" data-view="settings">
    <div class="heading"><h2>Account tools</h2></div>
    <div class="actions">
     <button id="passRegister" class="light">Add a passkey</button>
@@ -187,7 +203,7 @@
    <details><summary>Link an email address</summary><button type="button" id="linkEmailStart">Verify email</button><div id="linkEmailFlow"></div></details>
    <p id="toolStatus" role="status"></p>
   </article>
-  <footer>Save a <a href="?quick=expense">Quick expense</a> bookmark to open the expense form directly.</footer>
+  <footer data-view="settings">Save a <a href="?quick=expense">Quick expense</a> bookmark to open the expense form directly.</footer>
  </main>
  <dialog>
  <form id="form">
